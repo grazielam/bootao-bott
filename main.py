@@ -10,8 +10,8 @@ import sys
 # ==========================================
 # ⚙️ CONFIGURAÇÕES DA LOJA (COLOQUE SEUS IDs AQUI)
 # ==========================================
-ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos
-ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras
+ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos 
+ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras 
 ID_CATEGORIA_TICKETS = 1468070452655034499  # Substitua pelo ID da categoria onde os tickets serão abertos
 
 # ==========================================
@@ -47,59 +47,65 @@ class HuTaoBot(commands.Bot):
 
     async def setup_hook(self):
         # Registra as Views necessárias de forma persistente
-        self.add_view(ViewAbreTicket())
+        self.add_view(ViewAbreTicketDinamico())
         self.add_view(ViewBotaoDinamicoPersistente())
         self.add_view(ViewPainelLogin())
-        
-        # Sincroniza os comandos de barra para aparecerem no menu do app
         await self.tree.sync()
 
 bot = HuTaoBot()
 
 # ==========================================
-# 🎫 SISTEMA DE TICKET (ABRIR E CONFIGURAR)
+# 🎫 SISTEMA DE TICKET DINÂMICO PERSISTENTE
 # ==========================================
-class ViewAbreTicket(discord.ui.View):
-    def __init__(self):
+class ViewAbreTicketDinamico(discord.ui.View):
+    def __init__(self, botao_texto: str = "🛒 Fazer Pedido"):
         super().__init__(timeout=None)
+        self.add_item(discord.ui.Button(
+            label=botao_texto, 
+            style=discord.ButtonStyle.success, 
+            custom_id="btn_abrir_ticket_dinamico", 
+            emoji="🎫"
+        ))
 
-    @discord.ui.button(label="🛒 Fazer Pedido", style=discord.ButtonStyle.success, custom_id="btn_abrir_ticket", emoji="🎫")
-    async def abrir_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        guild = interaction.guild
-        categoria = discord.utils.get(guild.categories, id=ID_CATEGORIA_TICKETS)
-        
-        nome_canal = f"🛒-{interaction.user.name}"
-        
-        canal_existente = discord.utils.get(guild.text_channels, name=nome_canal.lower())
-        if canal_existente:
-            await interaction.response.send_message(f"❌ Você já possui um ticket aberto em {canal_existente.mention}!", ephemeral=True)
-            return
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.data.get("custom_id") == "btn_abrir_ticket_dinamico":
+            guild = interaction.guild
+            categoria = discord.utils.get(guild.categories, id=ID_CATEGORIA_TICKETS)
+            
+            nome_canal = f"🛒-{interaction.user.name}"
+            
+            canal_existente = discord.utils.get(guild.text_channels, name=nome_canal.lower())
+            if canal_existente:
+                await interaction.response.send_message(f"❌ Você já possui um ticket aberto em {canal_existente.mention}!", ephemeral=True)
+                return False
 
-        permissoes = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
-            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
-        }
+            permissoes = {
+                guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
+                guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+            }
 
-        canal_ticket = await guild.create_text_channel(
-            name=nome_canal,
-            category=categoria,
-            overwrites=permissoes,
-            topic=f"Ticket de {interaction.user.mention} para realizar um pedido."
-        )
+            canal_ticket = await guild.create_text_channel(
+                name=nome_canal,
+                category=categoria,
+                overwrites=permissoes,
+                topic=f"Ticket de {interaction.user.mention} para realizar um pedido."
+            )
 
-        await interaction.response.send_message(f"✅ Seu ticket foi criado com sucesso em {canal_ticket.mention}!", ephemeral=True)
+            await interaction.response.send_message(f"✅ Seu ticket foi criado com sucesso em {canal_ticket.mention}!", ephemeral=True)
 
-        embed_boas_vindas = discord.Embed(
-            title="🌸 Bem-vindo à Bootao Services!",
-            description=(
-                f"Olá {interaction.user.mention},\n"
-                "A Staff foi notificada e logo iniciará o seu atendimento!\n\n"
-                "Para agilizar o processo, você já pode utilizar o comando `/pix` para realizar o seu pagamento."
-            ),
-            color=discord.Color.from_rgb(120, 50, 150)
-        )
-        await canal_ticket.send(embed=embed_boas_vindas)
+            embed_boas_vindas = discord.Embed(
+                title="🌸 Bem-vindo à Bootao Services!",
+                description=(
+                    f"Olá {interaction.user.mention},\n"
+                    "A Staff foi notificada e logo iniciará o seu atendimento!\n\n"
+                    "Para agilizar o processo, você já pode utilizar o comando `/pix` para realizar o seu pagamento."
+                ),
+                color=discord.Color.from_rgb(120, 50, 150)
+            )
+            await canal_ticket.send(embed=embed_boas_vindas)
+            return True
+        return await super().interaction_check(interaction)
 
 # ==========================================
 # 🔘 RECEPTOR DE CLIQUES DOS BOTÕES PERSONALIZADOS
@@ -117,80 +123,21 @@ class ViewBotaoDinamicoPersistente(discord.ui.View):
         return await super().interaction_check(interaction)
 
 # ==========================================
-# 📥 MODAIS ADMINISTRATIVOS (FORMULÁRIOS)
+# 📥 FORMULÁRIOS CORRIGIDOS (MÁXIMO 1 MODAL POR COMANDO)
 # ==========================================
 
-class ModalEnvioPainelTicket(discord.ui.Modal, title="🛒 Configurar Destino do Painel"):
-    id_canal = discord.ui.TextInput(label="ID do Canal de Destino", placeholder="Cole o ID do canal aqui...", required=True)
-    url_imagem = discord.ui.TextInput(label="URL da Imagem (Opcional)", placeholder="Cole o link da imagem/banner...", required=False)
+class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de Tickets"):
+    titulo = discord.ui.TextInput(label="Título do Painel", placeholder="Ex: 🛒 Central de Pedidos", required=True)
+    descricao = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Escreva as regras/boas-vindas do seu ticket aqui...", required=True)
+    texto_botao = discord.ui.TextInput(label="Texto do Botão", placeholder="Ex: 🛒 Fazer Pedido", max_length=50, default="🛒 Fazer Pedido", required=True)
+    cor_hex = discord.ui.TextInput(label="Cor da Barra Lateral (Hex)", placeholder="Ex: #783296", required=False)
+    url_imagem = discord.ui.TextInput(label="URL da Imagem / Banner (Opcional)", placeholder="Cole o link da imagem...", required=False)
 
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            canal = interaction.guild.get_channel(int(self.id_canal.value))
-            if not canal or not isinstance(canal, discord.TextChannel):
-                await interaction.response.send_message("❌ ID de canal inválido ou não é um canal de texto!", ephemeral=True)
-                return
-        except ValueError:
-            await interaction.response.send_message("❌ O ID do canal deve conter apenas números!", ephemeral=True)
-            return
-
-        embed_ticket = discord.Embed(
-            title="🛒 Central de Pedidos — Bootao Services",
-            description=(
-                "Bem-vindo à nossa loja! Para fazer o seu pedido de forma segura, "
-                "clique no botão abaixo para abrir um ticket de atendimento exclusivo.\n\n"
-                "⚠️ **Aviso:** Não abra tickets sem a real intenção de compra."
-            ),
-            color=discord.Color.from_rgb(120, 50, 150)
-        )
-        
-        if self.url_imagem.value:
-            embed_ticket.set_image(url=self.url_imagem.value)
-
-        await canal.send(embed=embed_ticket, view=ViewAbreTicket())
-        await interaction.response.send_message(f"✅ Painel de Tickets enviado com sucesso em {canal.mention}!", ephemeral=True)
-
-
-class ModalConfigurarBotaoEmbed(discord.ui.Modal, title="🔘 Passo 2: Configurar o Botão"):
-    texto_botao = discord.ui.TextInput(label="Texto exibido no Botão", placeholder="Ex: Ver Informações Extras", max_length=80, required=True)
-    resposta_clique = discord.ui.TextInput(label="Mensagem ao Clicar (Apenas ele verá)", style=discord.TextStyle.paragraph, placeholder="Texto que aparece na tela do cliente quando ele aperta o botão...", required=True)
-
-    def __init__(self, canal, embed_pronta):
+    def __init__(self, canal):
         super().__init__()
         self.canal = canal
-        self.embed_pronta = embed_pronta
 
     async def on_submit(self, interaction: discord.Interaction):
-        view_customizada = discord.ui.View(timeout=None)
-        id_customizado = f"msg_custom_{self.resposta_clique.value}"
-        
-        view_customizada.add_item(discord.ui.Button(
-            label=self.texto_botao.value,
-            style=discord.ButtonStyle.primary,
-            custom_id=id_customizado[:100]
-        ))
-
-        await self.canal.send(embed=self.embed_pronta, view=view_customizada)
-        await interaction.response.send_message(f"✅ Embed com botão personalizado enviada em {self.canal.mention}!", ephemeral=True)
-
-
-class ModalCriarEmbedPersonalizado(discord.ui.Modal, title="🎨 Passo 1: Criar a Embed"):
-    id_canal = discord.ui.TextInput(label="ID do Canal de Destino", placeholder="Ex: 123456789...", required=True)
-    titulo = discord.ui.TextInput(label="Título da Embed", placeholder="Ex: 📜 Informações Adicionais", required=True)
-    descricao = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Informações do seu serviço aqui...", required=True)
-    cor_hex = discord.ui.TextInput(label="Cor da Barra Lateral (Hex)", placeholder="Ex: #783296 ou deixe vazio para Roxo", required=False)
-    url_imagem = discord.ui.TextInput(label="URL da Imagem / Banner", placeholder="Cole o link da imagem...", required=False)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            canal = interaction.guild.get_channel(int(self.id_canal.value))
-            if not canal or not isinstance(canal, discord.TextChannel):
-                await interaction.response.send_message("❌ ID de canal inválido ou não é um canal de texto!", ephemeral=True)
-                return
-        except ValueError:
-            await interaction.response.send_message("❌ O ID do canal deve conter apenas números!", ephemeral=True)
-            return
-
         cor = discord.Color.from_rgb(120, 50, 150)
         if self.cor_hex.value:
             try:
@@ -208,25 +155,73 @@ class ModalCriarEmbedPersonalizado(discord.ui.Modal, title="🎨 Passo 1: Criar 
         if self.url_imagem.value:
             embed_construida.set_image(url=self.url_imagem.value)
 
-        await interaction.response.send_modal(ModalConfigurarBotaoEmbed(canal, embed_construida))
+        view_ticket = ViewAbreTicketDinamico(botao_texto=self.texto_botao.value)
+        await self.canal.send(embed=embed_construida, view=view_ticket)
+        await interaction.response.send_message(f"✅ Painel de Tickets enviado com sucesso em {self.canal.mention}!", ephemeral=True)
+
+
+class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personalizada"):
+    titulo = discord.ui.TextInput(label="Título da Embed", placeholder="Ex: 📜 Informações Adicionais", required=True)
+    descricao = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Informações do seu serviço aqui...", required=True)
+    texto_botao = discord.ui.TextInput(label="Texto do Botão Informativo", placeholder="Ex: Ver Detalhes", required=True)
+    resposta_clique = discord.ui.TextInput(label="Mensagem ao Clicar (Apenas ele verá)", style=discord.TextStyle.paragraph, placeholder="O que aparece na tela do cliente quando ele aperta o botão...", required=True)
+    url_imagem = discord.ui.TextInput(label="URL da Imagem / Banner (Opcional)", placeholder="Cole o link da imagem...", required=False)
+
+    def __init__(self, canal, cor_hex):
+        super().__init__()
+        self.canal = canal
+        self.cor_hex = cor_hex
+
+    async def on_submit(self, interaction: discord.Interaction):
+        cor = discord.Color.from_rgb(120, 50, 150)
+        if self.cor_hex:
+            try:
+                hex_limpo = self.cor_hex.lstrip('#')
+                cor = discord.Color(int(hex_limpo, 16))
+            except ValueError:
+                pass
+
+        embed_construida = discord.Embed(
+            title=self.titulo.value,
+            description=self.descricao.value.replace(r'\n', '\n'),
+            color=cor
+        )
+
+        if self.url_imagem.value:
+            embed_construida.set_image(url=self.url_imagem.value)
+
+        view_customizada = discord.ui.View(timeout=None)
+        id_customizado = f"msg_custom_{self.resposta_clique.value}"
+        view_customizada.add_item(discord.ui.Button(
+            label=self.texto_botao.value,
+            style=discord.ButtonStyle.primary,
+            custom_id=id_customizado[:100]
+        ))
+
+        await self.canal.send(embed=embed_construida, view=view_customizada)
+        await interaction.response.send_message(f"✅ Embed personalizada enviada em {self.canal.mention}!", ephemeral=True)
 
 
 # ==========================================
-# 👑 COMANDOS DE BARRA ADMINISTRATIVOS (VAO APARECER NA SUA LISTA)
+# 👑 COMANDOS DE BARRA ADMINISTRATIVOS
 # ==========================================
 
-@bot.tree.command(name="setup_panel", description="Posta o painel de tickets em qualquer canal de texto")
-@app_commands.default_permissions(administrator=True) # Garante restrição nativa do Discord
-async def setup_panel_slash(interaction: discord.Interaction):
-    await interaction.response.send_modal(ModalEnvioPainelTicket())
+@bot.tree.command(name="setup_panel", description="Cria e envia um painel de tickets 100% customizável")
+@app_commands.describe(canal="Selecione o canal onde o painel de tickets será enviado")
+@app_commands.default_permissions(administrator=True)
+async def setup_panel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
+    # O canal é passado direto no comando de barra para poupar espaço no modal
+    await interaction.response.send_modal(ModalCriarSetupCompleto(canal))
 
 @bot.tree.command(name="criar_embed", description="Cria uma embed totalmente customizada com imagem e botão de resposta")
-@app_commands.default_permissions(administrator=True) # Garante restrição nativa do Discord
-async def criar_embed_slash(interaction: discord.Interaction):
-    await interaction.response.send_modal(ModalCriarEmbedPersonalizado())
+@app_commands.describe(canal="Canal de destino", cor_hex="Cor lateral em Hex (Ex: #783296)")
+@app_commands.default_permissions(administrator=True)
+async def criar_embed_slash(interaction: discord.Interaction, canal: discord.TextChannel, cor_hex: str = None):
+    # O canal e a cor são configurados direto na barra de comandos do Discord
+    await interaction.response.send_modal(ModalCriarEmbedCompleto(canal, cor_hex))
 
 @bot.tree.command(name="reiniciar", description="Reinicia o bot de forma limpa e segura")
-@app_commands.default_permissions(administrator=True) # Garante restrição nativa do Discord
+@app_commands.default_permissions(administrator=True)
 async def reiniciar_slash(interaction: discord.Interaction):
     await interaction.response.send_message("🔄 Reiniciando o bot de forma segura...", ephemeral=True)
     print("🚨 Bot desligado via comando de barra /reiniciar.")
