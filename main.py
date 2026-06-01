@@ -323,7 +323,7 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
 @bot.tree.command(name="fechar_ticket", description="Fecha o canal de atendimento atual")
 @app_commands.default_permissions(manage_channels=True)
 async def fechar_ticket(interaction: discord.Interaction):
-    await interaction.response.send_message("⏳ Deletando este canal de atendimento em 5 segundos...")
+    await interaction.response.send_message("Fechando o ticket em 5 segundos..")
     await asyncio.sleep(5)
     await interaction.channel.delete()
 
@@ -516,18 +516,6 @@ async def diferenca(interaction: discord.Interaction):
         "é ban de 50 anos (ban permanente)"
     )
     await interaction.response.send_message(texto_diferenca)
-
-@bot.tree.command(name="builds", description="Tipos de build")
-async def builds(interaction: discord.Interaction):
-    await interaction.response.send_message("🛠️ Builds de Dano Crítico, Suporte e Farm cadastrados!")
-
-@bot.tree.command(name="feedback", description="Pede a avaliação")
-async def feedback(interaction: discord.Interaction):
-    await interaction.response.send_message("🦋 Deixe sua avaliação de 🌟 a 🌟🌟🌟🌟🌟!")
-
-@bot.tree.command(name="genshin", description="Tabela de preços")
-async def genshin(interaction: discord.Interaction):
-    await interaction.response.send_message("📜 **Tabela Genshin Impact:**\n• 160 Gemas: R$ 2,00\n• 3200 Gemas: R$ 24,00")
 
 @bot.tree.command(name="termos", description="Links dos termos")
 async def termos(interaction: discord.Interaction):
