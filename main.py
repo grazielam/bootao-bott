@@ -46,12 +46,12 @@ class HuTaoBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Registra as Views de forma persistente para que os botões continuem funcionando mesmo se o bot reiniciar
+        # Registra as Views necessárias de forma persistente
         self.add_view(ViewAbreTicket())
-        self.add_view(ViewPainelSetupPanel())
-        self.add_view(ViewPainelCriarEmbed())
-        self.add_view(ViewPainelReiniciar())
         self.add_view(ViewBotaoDinamicoPersistente())
+        self.add_view(ViewPainelLogin())
+        
+        # Sincroniza os comandos de barra para aparecerem no menu do app
         await self.tree.sync()
 
 bot = HuTaoBot()
@@ -151,7 +151,6 @@ class ModalEnvioPainelTicket(discord.ui.Modal, title="🛒 Configurar Destino do
         await interaction.response.send_message(f"✅ Painel de Tickets enviado com sucesso em {canal.mention}!", ephemeral=True)
 
 
-# Passo 2: Configuração física do Botão e da sua resposta efémera
 class ModalConfigurarBotaoEmbed(discord.ui.Modal, title="🔘 Passo 2: Configurar o Botão"):
     texto_botao = discord.ui.TextInput(label="Texto exibido no Botão", placeholder="Ex: Ver Informações Extras", max_length=80, required=True)
     resposta_clique = discord.ui.TextInput(label="Mensagem ao Clicar (Apenas ele verá)", style=discord.TextStyle.paragraph, placeholder="Texto que aparece na tela do cliente quando ele aperta o botão...", required=True)
@@ -175,7 +174,6 @@ class ModalConfigurarBotaoEmbed(discord.ui.Modal, title="🔘 Passo 2: Configura
         await interaction.response.send_message(f"✅ Embed com botão personalizado enviada em {self.canal.mention}!", ephemeral=True)
 
 
-# Passo 1: Construção visual da Embed (Título, Descrição, Cor e Imagem)
 class ModalCriarEmbedPersonalizado(discord.ui.Modal, title="🎨 Passo 1: Criar a Embed"):
     id_canal = discord.ui.TextInput(label="ID do Canal de Destino", placeholder="Ex: 123456789...", required=True)
     titulo = discord.ui.TextInput(label="Título da Embed", placeholder="Ex: 📜 Informações Adicionais", required=True)
@@ -210,83 +208,30 @@ class ModalCriarEmbedPersonalizado(discord.ui.Modal, title="🎨 Passo 1: Criar 
         if self.url_imagem.value:
             embed_construida.set_image(url=self.url_imagem.value)
 
-        # Chama o Passo 2 imediatamente de forma encadeada
         await interaction.response.send_modal(ModalConfigurarBotaoEmbed(canal, embed_construida))
 
 
 # ==========================================
-# 🛠️ CLASSES ISOLADAS DE VIEWS DO MENU ADMIN
+# 👑 COMANDOS DE BARRA ADMINISTRATIVOS (VAO APARECER NA SUA LISTA)
 # ==========================================
 
-class ViewPainelSetupPanel(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
+@bot.tree.command(name="setup_panel", description="Posta o painel de tickets em qualquer canal de texto")
+@app_commands.default_permissions(administrator=True) # Garante restrição nativa do Discord
+async def setup_panel_slash(interaction: discord.Interaction):
+    await interaction.response.send_modal(ModalEnvioPainelTicket())
 
-    @discord.ui.button(label="Enviar", style=discord.ButtonStyle.secondary, custom_id="admin_btn_setup_isolated", emoji="▶️")
-    async def admin_setup(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Apenas administradores podem usar este painel.", ephemeral=True)
-            return
-        await interaction.response.send_modal(ModalEnvioPainelTicket())
+@bot.tree.command(name="criar_embed", description="Cria uma embed totalmente customizada com imagem e botão de resposta")
+@app_commands.default_permissions(administrator=True) # Garante restrição nativa do Discord
+async def criar_embed_slash(interaction: discord.Interaction):
+    await interaction.response.send_modal(ModalCriarEmbedPersonalizado())
 
-class ViewPainelCriarEmbed(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Enviar", style=discord.ButtonStyle.secondary, custom_id="admin_btn_embed_isolated", emoji="🎨")
-    async def admin_embed(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Apenas administradores podem usar este painel.", ephemeral=True)
-            return
-        await interaction.response.send_modal(ModalCriarEmbedPersonalizado())
-
-class ViewPainelReiniciar(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @discord.ui.button(label="Enviar", style=discord.ButtonStyle.secondary, custom_id="admin_btn_reiniciar_isolated", emoji="🔄")
-    async def admin_reiniciar(self, interaction: discord.Interaction, button: discord.ui.Button):
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Apenas administradores podem usar este painel.", ephemeral=True)
-            return
-        
-        await interaction.response.send_message("🔄 Reiniciando o bot de forma segura...", ephemeral=True)
-        print("🚨 Bot desligado via Painel de Controle Admin. Reiniciando...")
-        await bot.close()
-        sys.exit(0)
-
-
-# ==========================================
-# 🛑 GERADOR DO MENU DE CONTROLE ADMIN (PREFIXO)
-# ==========================================
-@bot.command(name="painel_admin")
-@commands.has_permissions(administrator=True)
-async def criar_painel_admin(ctx):
-    await ctx.message.delete()
-    
-    # 1. Linha do Setup Painel
-    embed_setup = discord.Embed(
-        title="**setup_panel**",
-        description="Posta o painel de tickets em qualquer canal de texto (admin)",
-        color=discord.Color.from_rgb(30, 30, 30)
-    )
-    await ctx.send(embed=embed_setup, view=ViewPainelSetupPanel())
-
-    # 2. Linha do Criador de Embeds Customizados com Botão
-    embed_personalizado = discord.Embed(
-        title="**criar_embed**",
-        description="Cria uma embed totalmente customizada com imagem, cor e botão secreto de resposta (admin)",
-        color=discord.Color.from_rgb(30, 30, 30)
-    )
-    await ctx.send(embed=embed_personalizado, view=ViewPainelCriarEmbed())
-
-    # 3. Linha de Reiniciar o Bot
-    embed_reiniciar = discord.Embed(
-        title="**reiniciar**",
-        description="Reinicia o bot (admin)",
-        color=discord.Color.from_rgb(30, 30, 30)
-    )
-    await ctx.send(embed=embed_reiniciar, view=ViewPainelReiniciar())
+@bot.tree.command(name="reiniciar", description="Reinicia o bot de forma limpa e segura")
+@app_commands.default_permissions(administrator=True) # Garante restrição nativa do Discord
+async def reiniciar_slash(interaction: discord.Interaction):
+    await interaction.response.send_message("🔄 Reiniciando o bot de forma segura...", ephemeral=True)
+    print("🚨 Bot desligado via comando de barra /reiniciar.")
+    await bot.close()
+    sys.exit(0)
 
 
 # ==========================================
@@ -419,17 +364,7 @@ class ModalGerarPix(discord.ui.Modal, title="👻 Gerar Cobrança PIX"):
         await interaction.response.send_message(embed=embed_pix, view=ViewPainelPix(CHAVE_PIX_PADRAO))
 
 
-# --- Comandos de barra normais para os clientes/atendimentos ---
-@bot.tree.command(name="criar_embed", description="Cria uma embed totalmente customizada com um botão e resposta efémera")
-@app_commands.default_permissions(administrator=True)
-async def criar_embed_slash(interaction: discord.Interaction):
-    # Permite abrir o criador de embeds diretamente digitando /criar_embed no Discord
-    await interaction.response.send_modal(ModalCriarEmbedPersonalizado())
-
-@bot.tree.command(name="setup_panel", description="Posta o painel de tickets em qualquer canal de texto")
-@app_commands.default_permissions(administrator=True)
-async def setup_panel_slash(interaction: discord.Interaction):
-    await interaction.response.send_modal(ModalEnvioPainelTicket())
+# --- Restante dos comandos normais do app ---
 
 @bot.tree.command(name="fechar_ticket", description="Fecha o canal")
 @app_commands.default_permissions(manage_channels=True)
