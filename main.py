@@ -7,6 +7,12 @@ import http.server
 import socketserver
 
 # ==========================================
+# ⚙️ CONFIGURAÇÕES DA LOJA (COLOQUE SEUS IDs AQUI)
+# ==========================================
+ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos
+ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras
+
+# ==========================================
 # 🌐 SERVIDOR WEB PARA MANTER O BOT ACORDADO
 # ==========================================
 def rodar_servidor_web():
@@ -44,15 +50,30 @@ class HuTaoBot(commands.Bot):
 bot = HuTaoBot()
 
 # ==========================================
+# 📜 VIEW DOS BOTÕES DE LINK (TERMOS E REGRAS)
+# ==========================================
+class ViewLinksTermos(discord.ui.View):
+    def __init__(self, guild_id: int, channel_termos_id: int, channel_regras_id: int):
+        super().__init__(timeout=None)
+        # Cria os links diretos para cada canal correspondente
+        url_termos = f"https://discord.com/channels/{guild_id}/{channel_termos_id}"
+        url_regras = f"https://discord.com/channels/{guild_id}/{channel_regras_id}"
+        
+        # Adiciona os botões de URL que redirecionam o usuário
+        self.add_item(discord.ui.Button(label="📜 Ler Termos de Compra", style=discord.ButtonStyle.link, url=url_termos))
+        self.add_item(discord.ui.Button(label="📋 Ver Regras", style=discord.ButtonStyle.link, url=url_regras))
+
+# ==========================================
 # 🔑 MODAL E FLUXO DE ENVIO DE DADOS DE ACESSO
 # ==========================================
 class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
-    email = discord.ui.TextInput(label="Email (completo)", placeholder="Ex: ceciliandrade2010@hotmail.com")
-    senha = discord.ui.TextInput(label="Senha (completa)", placeholder="Ex: babyrikicheg0u!")
-    servidor = discord.ui.TextInput(label="Servidor", placeholder="Ex: america")
-    metodo = discord.ui.TextInput(label="Método de Login", placeholder="Ex: direto no jogo")
+    email = discord.ui.TextInput(label="Email (completo)", placeholder="Ex: seuemail@gmail.com")
+    senha = discord.ui.TextInput(label="Senha (completa)", placeholder="Ex: suasenha123")
+    servidor = discord.ui.TextInput(label="Servidor", placeholder="Ex: america/europa..")
+    metodo = discord.ui.TextInput(label="Método de Login", placeholder="Ex: direto no jogo/google")
 
     async def on_submit(self, interaction: discord.Interaction):
+        # 1. Cria a Embed com as credenciais recebidas
         embed_recebido = discord.Embed(
             title="🔑 Dados de Acesso Recebidos",
             color=discord.Color.from_rgb(120, 50, 150)
@@ -63,8 +84,26 @@ class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
         embed_recebido.add_field(name="🔗 Método de Login", value=f"`{self.metodo.value}`", inline=True)
         embed_recebido.set_footer(text=f"Enviado por {interaction.user.name} 🌸")
 
+        # 2. Deleta o painel antigo de solicitação
         await interaction.message.delete()
+        
+        # 3. Envia os dados enviados no canal
         await interaction.response.send_message(embed=embed_recebido)
+
+        # 4. Cria a Embed de Termos da Bootao Services
+        embed_termos = discord.Embed(
+            title="📜 Termos de Compra — Bootao Services",
+            description=(
+                "• **Dados recebidos com sucesso!** ✨\n"
+                "Antes de começarmos, por favor leia nossos termos de compra.\n\n"
+                "Isso evita qualquer mal entendido durante o atendimento ❤️"
+            ),
+            color=discord.Color.from_rgb(120, 50, 150)
+        )
+        
+        # 5. Envia a mensagem de termos com os links configurados de forma independente
+        view_links = ViewLinksTermos(interaction.guild_id, ID_CANAL_TERMOS, ID_CANAL_REGRAS)
+        await interaction.followup.send(embed=embed_termos, view=view_links)
 
 class ViewPainelLogin(discord.ui.View):
     def __init__(self):
@@ -120,7 +159,7 @@ class ViewPainelPix(discord.ui.View):
         await interaction.message.delete()
         await interaction.response.send_message("🚨 Cobrança PIX cancelada pela Staff.", ephemeral=True)
 
-class ModalGerarPix(discord.ui.Modal, title="⚡ Gerar Cobrança PIX"):
+class ModalGerarPix(discord.ui.Modal, title="👻 Gerar Cobrança PIX"):
     valor = discord.ui.TextInput(label="Valor da cobrança (R$)", placeholder="Ex: 50")
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -132,7 +171,7 @@ class ModalGerarPix(discord.ui.Modal, title="⚡ Gerar Cobrança PIX"):
                 f"**R$ {self.valor.value}**\n\n"
                 "🔷 **Chave Pix:**\n"
                 f"`{CHAVE_PIX_PADRAO}`\n\n"
-                "Bootao Services 🌸"
+                "Bootao Services 🌹"
             ),
             color=discord.Color.from_rgb(20, 20, 20)
         )
@@ -169,7 +208,14 @@ async def login(interaction: discord.Interaction):
 
 @bot.tree.command(name="diferenca", description="Diferença entre Manual e Script")
 async def diferenca(interaction: discord.Interaction):
-    await interaction.response.send_message("👻 **Manual:** Total segurança.\n🤖 **Script:** Automação rápida.")
+    texto_diferenca = (
+        "• **Manual:** tudo é feito na mão, 100% seguro!, o prazo de entrega costuma ser maior.\n"
+        "• **Script:** usamos programas para agilizar o farm, então o prazo de entrega é menor + tem risco sim, "
+        "pois o script não está em um estado 100% seguro, mas se a pessoa não tem historico de banimento, o máximo "
+        "que pode acontecer é o ban de uma semana, se já tiver levado ban duas vezes é ban de 1 mês se for o terceiro "
+        "é ban de 50 anos (ban permanente)"
+    )
+    await interaction.response.send_message(texto_diferenca)
 
 @bot.tree.command(name="builds", description="Tipos de build")
 async def builds(interaction: discord.Interaction):
