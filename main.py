@@ -2,8 +2,32 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import os
+import threading
+import http.server
+import socketserver
 
-# Puxa a chave PIX de forma segura do painel do Zeabur (Se não achar, usa a padrão)
+# ==========================================
+# 🌐 SERVIDOR WEB PARA MANTER O BOT ACORDADO
+# ==========================================
+def rodar_servidor_web():
+    class Handler(http.server.SimpleHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-type", "text/html")
+            self.end_headers()
+            self.wfile.write(b"Bot Online 24/7!")
+
+    port = int(os.getenv("PORT", 8080))
+    with socketserver.TCPServer(("", port), Handler) as httpd:
+        print(f"Servidor Web ativo na porta {port}")
+        httpd.serve_forever()
+
+# Inicia o servidor web em uma linha separada para não travar o bot
+threading.Thread(target=rodar_servidor_web, daemon=True).start()
+
+# ==========================================
+# 🤖 CONFIGURAÇÃO DO BOT
+# ==========================================
 CHAVE_PIX_PADRAO = os.getenv("CHAVE_PIX", "bootaoservices01@gmail.com")
 
 class HuTaoBot(commands.Bot):
@@ -108,7 +132,7 @@ class ModalGerarPix(discord.ui.Modal, title="⚡ Gerar Cobrança PIX"):
                 f"**R$ {self.valor.value}**\n\n"
                 "🔷 **Chave Pix:**\n"
                 f"`{CHAVE_PIX_PADRAO}`\n\n"
-                "Inazuma Store 🌸"
+                "Bootao Services 🌸"
             ),
             color=discord.Color.from_rgb(20, 20, 20)
         )
@@ -161,11 +185,10 @@ async def genshin(interaction: discord.Interaction):
 
 @bot.tree.command(name="termos", description="Links dos termos")
 async def termos(interaction: discord.Interaction):
-    await interaction.response.send_message("⚖️ Ao comprar, você aceita as diretrizes de serviço.")
+    await interaction.response.send_message("⚖️ Ao comprar, você aceita as diretrizes de serviço da Bootao Services.")
 
 @bot.event
 async def on_ready():
-    print(f"👻 Bot {bot.user.name} está online no Zeabur!")
+    print(f"👻 Bot {bot.user.name} está online no Render!")
 
-# Puxa o Token de forma segura do painel secreto
 bot.run(os.getenv("DISCORD_TOKEN"))
