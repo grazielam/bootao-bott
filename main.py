@@ -323,7 +323,7 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
 @bot.tree.command(name="fechar_ticket", description="Fecha o canal de atendimento atual")
 @app_commands.default_permissions(manage_channels=True)
 async def fechar_ticket(interaction: discord.Interaction):
-    await interaction.response.send_message("⏳ Trancando ticket e deletando este canal em 5 segundos...")
+    await interaction.response.send_message("⏳ Deletando este canal de atendimento em 5 segundos...")
     await asyncio.sleep(5)
     await interaction.channel.delete()
 
@@ -395,8 +395,6 @@ class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
     metodo = discord.ui.TextInput(label="Método de Login", placeholder="Ex: direto no jogo/google")
 
     async def on_submit(self, interaction: discord.Interaction):
-        mensagem_painel = interaction.message
-
         embed_termos = gerar_embed_termos()
         view_links = ViewLinksTermos(interaction.guild_id, ID_CANAL_TERMOS, ID_CANAL_REGRAS)
         await interaction.response.send_message(embed=embed_termos, view=view_links)
@@ -412,12 +410,6 @@ class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
         embed_recebido.set_footer(text=f"Enviado por {interaction.user.name} 🌸")
 
         await interaction.channel.send(embed=embed_recebido)
-
-        if mensagem_painel:
-            try:
-                await mensagem_painel.delete()
-            except discord.NotFound:
-                pass
 
 class ViewPainelLogin(discord.ui.View):
     def __init__(self):
@@ -545,6 +537,6 @@ async def termos(interaction: discord.Interaction):
 
 @bot.event
 async def on_ready():
-    print(f"👻 Bot {bot.user.name} online. Configurações de canais e categoria atualizadas com sucesso!")
+    print(f"👻 Bot {bot.user.name} online e corrigido para deletar canais perfeitamente!")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
