@@ -14,7 +14,7 @@ import sqlite3
 # ==========================================
 ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos 
 ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras 
-ID_CATEGORIA_TICKETS = 1468070452655034499  # Substitua pelo ID da categoria onde os tickets serão abertos
+ID_CATEGORIA_TICKETS = 1468070452655034499  # Substitua pelo ID da categoria onde os tickets serão abertos 
 
 # ==========================================
 # 🌐 SERVIDOR WEB PARA MANTER O BOT ACORDADO
@@ -40,11 +40,12 @@ threading.Thread(target=rodar_servidor_web, daemon=True).start()
 def inicializar_banco():
     conn = sqlite3.connect("dados_loja.db")
     cursor = conn.cursor()
+    # Mudamos a chave primária para o título da embed principal para associar corretamente o clique
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS embeds_personalizados (
-            id_botao TEXT PRIMARY KEY,
-            titulo TEXT,
-            texto TEXT,
+            titulo_chave TEXT PRIMARY KEY,
+            titulo_resposta TEXT,
+            texto_resposta TEXT,
             imagem_resposta TEXT,
             cor_int INTEGER
         )
@@ -54,44 +55,130 @@ def inicializar_banco():
 
 inicializar_banco()
 
-def salvar_embed_no_banco(id_botao, titulo, texto, imagem_resposta, cor_int):
+def salvar_embed_no_banco(titulo_chave, titulo_resposta, texto_resposta, imagem_resposta, cor_int):
     conn = sqlite3.connect("dados_loja.db")
     cursor = conn.cursor()
     cursor.execute("""
-        INSERT OR REPLACE INTO embeds_personalizados (id_botao, titulo, texto, imagem_resposta, cor_int)
+        INSERT OR REPLACE INTO embeds_personalizados (titulo_chave, titulo_resposta, texto_resposta, imagem_resposta, cor_int)
         VALUES (?, ?, ?, ?, ?)
-    """, (id_botao, titulo, texto, imagem_resposta, cor_int))
+    """, (titulo_chave, titulo_resposta, texto_resposta, imagem_resposta, cor_int))
     conn.commit()
     conn.close()
 
-def puxar_embed_do_banco(id_botao):
+def puxar_embed_do_banco(titulo_chave):
     conn = sqlite3.connect("dados_loja.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT titulo, texto, imagem_resposta, cor_int FROM embeds_personalizados WHERE id_botao = ?", (id_botao,))
+    cursor.execute("SELECT titulo_resposta, texto_resposta, imagem_resposta, cor_int FROM embeds_personalizados WHERE titulo_chave = ?", (titulo_chave,))
     resultado = cursor.fetchone()
     conn.close()
     if resultado:
         return {
-            "titulo": resultado[0],
-            "texto": resultado[1],
+            "titulo_resposta": resultado[0],
+            "texto_resposta": resultado[1],
             "imagem_resposta": resultado[2],
             "cor_int": resultado[3]
         }
     return None
 
-def listar_todos_ids_banco():
-    conn = sqlite3.connect("dados_loja.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT id_botao FROM embeds_personalizados")
-    resultados = cursor.fetchall()
-    conn.close()
-    return [r[0] for r in resultados]
-
 # ==========================================
-# 🤖 CONFIGURAÇÃO DO BOT
+# 🤖 CONFIGURAÇÃO DO BOT E VIEWS GLOBAIS
 # ==========================================
 CHAVE_PIX_PADRAO = os.getenv("CHAVE_PIX", "bootaoservices01@gmail.com")
 SETUP_TEMPORARIO_PARAMETROS = {}
+
+# 🔘 NOVA VIEW GLOBAL PARA OS BOTÕES PERSONALIZADOS
+class ViewBotaoDinamicoGlobal(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="Visualizar Informações", style=discord.ButtonStyle.primary, custom_id="btn_global_visualizar_info")
+    async def responder_clique_dinamico(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Identifica qual painel foi clicado usando o título da embed que contém o botão
+        if not interaction.message.embeds:
+            await interaction.response.send_message("❌ Erro: Não foi possível identificar a embed deste painel.", ephemeral=True)
+            return
+
+        titulo_painel = interaction.message.embeds[0].title
+        dados_guardados = puxar_embed_do_banco(titulo_painel)
+        
+        if dados_guardados:
+            titulo_res = dados_guardados.get("titulo_resposta", "Informações")
+            texto_original = dados_guardados.get("texto_resposta", "")
+            img_rodape_url = dados_guardados.get("imagem_resposta", "")
+            cor_int = dados_guardados.get("cor_int", 7877270)
+            cor = discord.Color(cor_int)
+            
+            regex_imagens = r'(https?://\S+\.(?:png|jpg|jpeg|gif|webp))'
+            links_encontrados = re.findall(regex_imagens, texto_original, re.IGNORECASE)
+            texto_limpo = re.sub(regex_imagens, '', texto_original).strip()
+            
+            lista_embeds = []
+            
+            embed_texto = discord.Embed(
+                title=titulo_res,
+                description=texto_limpo if texto_limpo else "Visualizar Imagens anexadas:",
+                color=cor
+            )
+            
+            if img_rodape_url:
+                embed_texto.set_image(url=img_rodape_url)
+                lista_embeds.append(embed_texto)
+            else:
+                if links_encontrados:
+                    embed_texto.set_image(url=links_encontrados.pop(0))
+                lista_embeds.append(embed_texto)
+            
+            for link_img in links_encontrados[:9]:
+                embed_extra = discord.Embed(color=cor)
+                embed_extra.set_image(url=link_img)
+                lista_embeds.append(embed_extra)
+            
+            await interaction.response.send_message(embeds=lista_embeds, ephemeral=True)
+        else:
+            await interaction.response.send_message(f"❌ Nenhuma configuração encontrada para o painel: **{titulo_painel}**.", ephemeral=True)
+
+
+class ViewAbreTicketDinamico(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=None)
+
+    @discord.ui.button(label="🛒 Fazer Pedido", style=discord.ButtonStyle.success, custom_id="btn_abrir_ticket_dinamico", emoji="🎫")
+    async def abrir_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
+        guild = interaction.guild
+        categoria = discord.utils.get(guild.categories, id=ID_CATEGORIA_TICKETS)
+        nome_canal = f"🛒-{interaction.user.name}"
+        
+        canal_existente = discord.utils.get(guild.text_channels, name=nome_canal.lower())
+        if canal_existente:
+            await interaction.response.send_message(f"❌ Você já possui um ticket aberto em {canal_existente.mention}!", ephemeral=True)
+            return
+
+        permissoes = {
+            guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
+            guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
+        }
+
+        canal_ticket = await guild.create_text_channel(
+            name=nome_canal,
+            category=categoria,
+            overwrites=permissoes,
+            topic=f"Ticket de {interaction.user.mention} para realizar um pedido."
+        )
+
+        await interaction.response.send_message(f"✅ Seu ticket foi criado com sucesso em {canal_ticket.mention}!", ephemeral=True)
+
+        embed_boas_vindas = discord.Embed(
+            title="🌸 Bem-vindo à Bootao Services!",
+            description=(
+                f"Olá {interaction.user.mention},\n"
+                "A Staff foi notificada e logo iniciará o seu atendimento!\n\n"
+                "Para agilizar o processo, você já pode utilizar o comando `/pix` para realizar o seu pagamento."
+            ),
+            color=discord.Color.from_rgb(120, 50, 150)
+        )
+        await canal_ticket.send(embed=embed_boas_vindas)
+
 
 class HuTaoBot(commands.Bot):
     def __init__(self):
@@ -102,137 +189,22 @@ class HuTaoBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Registra as views estáticas padrão
+        # Aqui registramos as Views persistentes globais do Bot.
+        # Elas NUNCA vão falhar após o bot reiniciar porque os seus IDs internos são fixos!
         self.add_view(ViewAbreTicketDinamico())
         self.add_view(ViewPainelLogin())
-        
-        # Recarrega todos os botões customizados salvos no banco para que voltem a funcionar ao ligar o bot
-        ids_salvos = listar_todos_ids_banco()
-        for id_botao in ids_salvos:
-            self.add_view(ViewBotaoDinamicoPersistente(custom_id=id_botao))
-            
+        self.add_view(ViewBotaoDinamicoGlobal())
         await self.tree.sync()
 
 bot = HuTaoBot()
 
 # ==========================================
-# 🎫 SISTEMA DE TICKET DINÂMICO PERSISTENTE
-# ==========================================
-class ViewAbreTicketDinamico(discord.ui.View):
-    def __init__(self, botao_texto: str = "🛒 Fazer Pedido"):
-        super().__init__(timeout=None)
-        self.add_item(discord.ui.Button(
-            label=botao_texto, 
-            style=discord.ButtonStyle.success, 
-            custom_id="btn_abrir_ticket_dinamico", 
-            emoji="🎫"
-        ))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.data.get("custom_id") == "btn_abrir_ticket_dinamico":
-            guild = interaction.guild
-            categoria = discord.utils.get(guild.categories, id=ID_CATEGORIA_TICKETS)
-            
-            nome_canal = f"🛒-{interaction.user.name}"
-            
-            canal_existente = discord.utils.get(guild.text_channels, name=nome_canal.lower())
-            if canal_existente:
-                await interaction.response.send_message(f"❌ Você já possui um ticket aberto em {canal_existente.mention}!", ephemeral=True)
-                return False
-
-            permissoes = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
-                guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
-            }
-
-            canal_ticket = await guild.create_text_channel(
-                name=nome_canal,
-                category=categoria,
-                overwrites=permissoes,
-                topic=f"Ticket de {interaction.user.mention} para realizar um pedido."
-            )
-
-            await interaction.response.send_message(f"✅ Seu ticket foi criado com sucesso em {canal_ticket.mention}!", ephemeral=True)
-
-            embed_boas_vindas = discord.Embed(
-                title="🌸 Bem-vindo à Bootao Services!",
-                description=(
-                    f"Olá {interaction.user.mention},\n"
-                    "A Staff foi notificada e logo iniciará o seu atendimento!\n\n"
-                    "Para agilizar o processo, você já pode utilizar o comando `/pix` para realizar o seu pagamento."
-                ),
-                color=discord.Color.from_rgb(120, 50, 150)
-            )
-            await canal_ticket.send(embed=embed_boas_vindas)
-            return True
-        return await super().interaction_check(interaction)
-
-# ==========================================
-# 🔘 RECEPTOR DE CLIQUES REESCRITO (PERSISTENTE)
-# ==========================================
-class ViewBotaoDinamicoPersistente(discord.ui.View):
-    def __init__(self, custom_id: str, label_botao: str = "Visualizar"):
-        super().__init__(timeout=None)
-        self.custom_id = custom_id
-        self.add_item(discord.ui.Button(
-            label=label_botao,
-            style=discord.ButtonStyle.primary,
-            custom_id=custom_id
-        ))
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        custom_id = interaction.data.get("custom_id", "")
-        
-        if custom_id == self.custom_id:
-            dados_guardados = puxar_embed_do_banco(custom_id)
-            
-            if dados_guardados:
-                titulo = dados_guardados.get("titulo", "Informações")
-                texto_original = dados_guardados.get("texto", "")
-                img_rodape_url = dados_guardados.get("imagem_resposta", "")
-                cor_int = dados_guardados.get("cor_int", 7877270)
-                cor = discord.Color(cor_int)
-                
-                regex_imagens = r'(https?://\S+\.(?:png|jpg|jpeg|gif|webp))'
-                links_encontrados = re.findall(regex_imagens, texto_original, re.IGNORECASE)
-                texto_limpo = re.sub(regex_imagens, '', texto_original).strip()
-                
-                lista_embeds = []
-                
-                embed_texto = discord.Embed(
-                    title=titulo,
-                    description=texto_limpo if texto_limpo else "Visualizar Imagens anexadas:",
-                    color=cor
-                )
-                
-                if img_rodape_url:
-                    embed_texto.set_image(url=img_rodape_url)
-                    lista_embeds.append(embed_texto)
-                else:
-                    if links_encontrados:
-                        embed_texto.set_image(url=links_encontrados.pop(0))
-                    lista_embeds.append(embed_texto)
-                
-                for link_img in links_encontrados[:9]:
-                    embed_extra = discord.Embed(color=cor)
-                    embed_extra.set_image(url=link_img)
-                    lista_embeds.append(embed_extra)
-                
-                await interaction.response.send_message(embeds=lista_embeds, ephemeral=True)
-            else:
-                await interaction.response.send_message("❌ Erro: As informações desse botão não foram encontradas no banco de dados!", ephemeral=True)
-            return True
-        return await super().interaction_check(interaction)
-
-# ==========================================
-# 📥 FORMULÁRIOS DE CONFIGURAÇÃO OTIMIZADOS
+# 📥 FORMULÁRIOS DE CONFIGURAÇÃO INTERATIVOS
 # ==========================================
 
 class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de Tickets"):
     titulo = discord.ui.TextInput(label="Título do Painel", placeholder="Ex: 🛒 Central de Pedidos", required=True)
     description = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Escreva as regras/boas-vindas do seu ticket aqui...", required=True)
-    texto_botao = discord.ui.TextInput(label="Texto do Botão", placeholder="Ex: 🛒 Fazer Pedido", max_length=50, default="🛒 Fazer Pedido", required=True)
     cor_hex = discord.ui.TextInput(label="Cor da Barra Lateral (Hex)", placeholder="Ex: #783296", required=False)
     url_imagem = discord.ui.TextInput(label="URL da Imagem / Banner (Opcional)", placeholder="Cole o link da imagem...", required=False)
 
@@ -258,8 +230,7 @@ class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de
         if self.url_imagem.value:
             embed_construida.set_image(url=self.url_imagem.value)
 
-        view_ticket = ViewAbreTicketDinamico(botao_texto=self.texto_botao.value)
-        await self.canal.send(embed=embed_construida, view=view_ticket)
+        await self.canal.send(embed=embed_construida, view=ViewAbreTicketDinamico())
         await interaction.response.send_message(f"✅ Painel de Tickets enviado com sucesso em {self.canal.mention}!", ephemeral=True)
 
 
@@ -267,7 +238,7 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
     titulo = discord.ui.TextInput(label="Título da Embed Principal", placeholder="Ex: 📜 Tabela de Valores", required=True)
     description = discord.ui.TextInput(label="Descrição / Texto da Embed Principal", style=discord.TextStyle.paragraph, placeholder="Clique no botão abaixo e veja nossos valores...", required=True)
     texto_botao = discord.ui.TextInput(label="Texto do Botão Informativo", placeholder="Ex: 👻 Valores", max_length=50, required=True)
-    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Cole links de imagem tbm!)", style=discord.TextStyle.paragraph, placeholder="Pode escrever seu texto normalmente e colar links de imagens direto aqui!", required=True)
+    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Ao clicar)", style=discord.TextStyle.paragraph, placeholder="Escreva seu texto e links de imagens direto aqui!", required=True)
     url_imagem_resposta = discord.ui.TextInput(label="URL da Imagem da Resposta (Opcional)", placeholder="Cole um link de imagem que aparece ao clicar...", required=False)
 
     def __init__(self, token_referencia: str):
@@ -281,7 +252,7 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
         url_imagem_principal = parametros.get("url_imagem_principal")
 
         if not canal:
-            await interaction.response.send_message("❌ Houve um erro de sessão ao processar o canal. Tente usar o comando novamente.", ephemeral=True)
+            await interaction.response.send_message("❌ Houve um erro de sessão. Tente usar o comando novamente.", ephemeral=True)
             return
 
         cor = discord.Color.from_rgb(120, 50, 150)
@@ -301,24 +272,23 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
         if url_imagem_principal:
             embed_construida.set_image(url=url_imagem_principal)
 
-        # ID único estrito baseado no ID da mensagem gerada
-        id_unico_botao = f"info_{interaction.id}"
-        
+        # Salva as informações da resposta usando o TÍTULO PRINCIPAL como chave única de busca
         salvar_embed_no_banco(
-            id_botao=id_unico_botao,
-            titulo=self.titulo.value,
-            texto=self.resposta_clique.value.replace(r'\n', '\n'),
+            titulo_chave=self.titulo.value,
+            titulo_resposta=self.titulo.value,
+            texto_resposta=self.resposta_clique.value.replace(r'\n', '\n'),
             imagem_resposta=self.url_imagem_resposta.value if self.url_imagem_resposta.value else None,
             cor_int=cor.value
         )
 
-        # Cria a view diretamente associada ao ID criado e adiciona ao loop do bot ativo
-        view_customizada = ViewBotaoDinamicoPersistente(custom_id=id_unico_botao, label_botao=self.texto_botao.value)
-        interaction.client.add_view(view_customizada)
+        # Criamos a View Global e alteramos dinamicamente apenas o texto (Label) do botão para o que você escolheu
+        view_global = ViewBotaoDinamicoGlobal()
+        view_global.children[0].label = self.texto_botao.value
 
-        await canal.send(embed=embed_construida, view=view_customizada)
-        await interaction.response.send_message(f"✅ Embed personalizada salva e enviada com sucesso em {canal.mention}!", ephemeral=True)
+        await canal.send(embed=embed_construida, view=view_global)
+        await interaction.response.send_message(f"✅ Embed personalizada enviada com sucesso em {canal.mention}!", ephemeral=True)
         
+        # Limpa cache temporário
         SETUP_TEMPORARIO_PARAMETROS.pop(self.token_referencia, None)
 
 
@@ -550,6 +520,6 @@ async def termos(interaction: discord.Interaction):
 
 @bot.event
 async def on_ready():
-    print(f"👻 Bot {bot.user.name} está online e com banco de dados seguro!")
+    print(f"👻 Bot {bot.user.name} está online com Views Globais e Persistência Ativa!")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
