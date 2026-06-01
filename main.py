@@ -85,7 +85,6 @@ def puxar_embed_do_banco(titulo_chave):
 # 🤖 CONFIGURAÇÃO DO BOT E VIEWS GLOBAIS
 # ==========================================
 CHAVE_PIX_PADRAO = os.getenv("CHAVE_PIX", "bootaoservices01@gmail.com")
-SETUP_TEMPORARIO_PARAMETROS = {}
 
 class ViewBotaoDinamicoGlobal(discord.ui.View):
     def __init__(self):
@@ -183,10 +182,11 @@ class HuTaoBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
+        self.tree.clear_commands(guild=None) # LIMPA COMANDOS ANTIGOS DO DISCORD
         self.add_view(ViewAbreTicketDinamico())
         self.add_view(ViewPainelLogin())
         self.add_view(ViewBotaoDinamicoGlobal())
-        await self.tree.sync() # ISSO LIMPA OS COMANDOS ANTIGOS DO DISCORD
+        await self.tree.sync() 
 
 bot = HuTaoBot()
 
@@ -298,6 +298,6 @@ class ViewPainelPix(discord.ui.View):
 
 @bot.event
 async def on_ready():
-    print(f"👻 Bot {bot.user.name} pronto! Comandos antigos removidos.")
+    print(f"👻 Bot {bot.user.name} pronto! Comandos removidos.")
 
 bot.run(os.getenv("DISCORD_TOKEN"))
