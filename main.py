@@ -13,7 +13,6 @@ import sys
 ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos 
 ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras 
 ID_CATEGORIA_TICKETS = 1468070452655034499  # Substitua pelo ID da categoria onde os tickets serão abertos
-
 # ==========================================
 # 🌐 SERVIDOR WEB PARA MANTER O BOT ACORDADO
 # ==========================================
@@ -36,6 +35,9 @@ threading.Thread(target=rodar_servidor_web, daemon=True).start()
 # 🤖 CONFIGURAÇÃO DO BOT
 # ==========================================
 CHAVE_PIX_PADRAO = os.getenv("CHAVE_PIX", "bootaoservices01@gmail.com")
+
+# Dicionário global para guardar os textos e imagens das respostas dos botões
+TEXTOS_EMBED_MEMORIA = {}
 
 class HuTaoBot(commands.Bot):
     def __init__(self):
@@ -108,7 +110,7 @@ class ViewAbreTicketDinamico(discord.ui.View):
         return await super().interaction_check(interaction)
 
 # ==========================================
-# 🔘 RECEPTOR DE CLIQUES DOS BOTÕES PERSONALIZADOS
+# 🔘 RECEPTOR DE CLIQUES DOS BOTÕES INFORMATIVOS
 # ==========================================
 class ViewBotaoDinamicoPersistente(discord.ui.View):
     def __init__(self):
@@ -116,19 +118,40 @@ class ViewBotaoDinamicoPersistente(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         custom_id = interaction.data.get("custom_id", "")
-        if custom_id.startswith("msg_custom_"):
-            mensagem_para_exibir = custom_id.replace("msg_custom_", "", 1)
-            await interaction.response.send_message(mensagem_para_exibir, ephemeral=True)
+        
+        if custom_id.startswith("info_"):
+            dados_guardados = TEXTOS_EMBED_MEMORIA.get(custom_id)
+            
+            if dados_guardados:
+                titulo = dados_guardados.get("titulo", "Informações")
+                texto = dados_guardados.get("texto", "")
+                img_url = dados_guardados.get("imagem_resposta", "")
+                cor = dados_guardados.get("cor", discord.Color.from_rgb(120, 50, 150))
+                
+                # Cria uma nova Embed linda contendo o texto e a imagem que você configurou
+                embed_resposta = discord.Embed(
+                    title=titulo,
+                    description=texto,
+                    color=cor
+                )
+                
+                if img_url:
+                    embed_resposta.set_image(url=img_url)
+                
+                # Envia de forma oculta apenas para quem clicou (ephemeral)
+                await interaction.response.send_message(embed=embed_resposta, ephemeral=True)
+            else:
+                await interaction.response.send_message("ℹ️ Use os comandos da loja ou abra um ticket para suporte completo!", ephemeral=True)
             return True
         return await super().interaction_check(interaction)
 
 # ==========================================
-# 📥 FORMULÁRIOS CORRIGIDOS (MÁXIMO 1 MODAL POR COMANDO)
+# 📥 FORMULÁRIOS DE CONFIGURAÇÃO IMEDIATA
 # ==========================================
 
 class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de Tickets"):
     titulo = discord.ui.TextInput(label="Título do Painel", placeholder="Ex: 🛒 Central de Pedidos", required=True)
-    descricao = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Escreva as regras/boas-vindas do seu ticket aqui...", required=True)
+    description = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Escreva as regras/boas-vindas do seu ticket aqui...", required=True)
     texto_botao = discord.ui.TextInput(label="Texto do Botão", placeholder="Ex: 🛒 Fazer Pedido", max_length=50, default="🛒 Fazer Pedido", required=True)
     cor_hex = discord.ui.TextInput(label="Cor da Barra Lateral (Hex)", placeholder="Ex: #783296", required=False)
     url_imagem = discord.ui.TextInput(label="URL da Imagem / Banner (Opcional)", placeholder="Cole o link da imagem...", required=False)
@@ -148,7 +171,7 @@ class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de
 
         embed_construida = discord.Embed(
             title=self.titulo.value,
-            description=self.descricao.value.replace(r'\n', '\n'),
+            description=self.description.value.replace(r'\n', '\n'),
             color=cor
         )
 
@@ -161,16 +184,17 @@ class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de
 
 
 class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personalizada"):
-    titulo = discord.ui.TextInput(label="Título da Embed", placeholder="Ex: 📜 Informações Adicionais", required=True)
-    descricao = discord.ui.TextInput(label="Descrição / Texto", style=discord.TextStyle.paragraph, placeholder="Informações do seu serviço aqui...", required=True)
-    texto_botao = discord.ui.TextInput(label="Texto do Botão Informativo", placeholder="Ex: Ver Detalhes", required=True)
-    resposta_clique = discord.ui.TextInput(label="Mensagem ao Clicar (Apenas ele verá)", style=discord.TextStyle.paragraph, placeholder="O que aparece na tela do cliente quando ele aperta o botão...", required=True)
-    url_imagem = discord.ui.TextInput(label="URL da Imagem / Banner (Opcional)", placeholder="Cole o link da imagem...", required=False)
+    titulo = discord.ui.TextInput(label="Título da Embed Principal", placeholder="Ex: 📜 Tabela de Valores", required=True)
+    description = discord.ui.TextInput(label="Descrição / Texto da Embed Principal", style=discord.TextStyle.paragraph, placeholder="Clique no botão abaixo e veja nossos valores...", required=True)
+    texto_botao = discord.ui.TextInput(label="Texto do Botão Informativo", placeholder="Ex: 👻 Valores", max_length=50, required=True)
+    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Ao clicar)", style=discord.TextStyle.paragraph, placeholder="Escreva aqui o texto/tabela que vai aparecer na resposta...", required=True)
+    url_imagem_resposta = discord.ui.TextInput(label="URL da Imagem da Resposta (Opcional)", placeholder="Cole o link da imagem que aparece ao clicar...", required=False)
 
-    def __init__(self, canal, cor_hex):
+    def __init__(self, canal, cor_hex, url_imagem_principal):
         super().__init__()
         self.canal = canal
         self.cor_hex = cor_hex
+        self.url_imagem_principal = url_imagem_principal
 
     async def on_submit(self, interaction: discord.Interaction):
         cor = discord.Color.from_rgb(120, 50, 150)
@@ -181,25 +205,36 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
             except ValueError:
                 pass
 
+        # Cria a Embed Principal que fica fixa no canal
         embed_construida = discord.Embed(
             title=self.titulo.value,
-            description=self.descricao.value.replace(r'\n', '\n'),
+            description=self.description.value.replace(r'\n', '\n'),
             color=cor
         )
 
-        if self.url_imagem.value:
-            embed_construida.set_image(url=self.url_imagem.value)
+        if self.url_imagem_principal:
+            embed_construida.set_image(url=self.url_imagem_principal)
+
+        # Gera um ID único e curto baseado na ID da interação
+        id_unico_botao = f"info_{interaction.id}"
+        
+        # Salva o texto longo E a URL da nova imagem na nossa memória segura
+        TEXTOS_EMBED_MEMORIA[id_unico_botao] = {
+            "titulo": self.titulo.value,
+            "texto": self.resposta_clique.value.replace(r'\n', '\n'),
+            "imagem_resposta": self.url_imagem_resposta.value if self.url_imagem_resposta.value else None,
+            "cor": cor
+        }
 
         view_customizada = discord.ui.View(timeout=None)
-        id_customizado = f"msg_custom_{self.resposta_clique.value}"
         view_customizada.add_item(discord.ui.Button(
             label=self.texto_botao.value,
             style=discord.ButtonStyle.primary,
-            custom_id=id_customizado[:100]
+            custom_id=id_unico_botao
         ))
 
         await self.canal.send(embed=embed_construida, view=view_customizada)
-        await interaction.response.send_message(f"✅ Embed personalizada enviada em {self.canal.mention}!", ephemeral=True)
+        await interaction.response.send_message(f"✅ Embed personalizada enviada com sucesso em {self.canal.mention}!", ephemeral=True)
 
 
 # ==========================================
@@ -210,15 +245,23 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
 @app_commands.describe(canal="Selecione o canal onde o painel de tickets será enviado")
 @app_commands.default_permissions(administrator=True)
 async def setup_panel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
-    # O canal é passado direto no comando de barra para poupar espaço no modal
     await interaction.response.send_modal(ModalCriarSetupCompleto(canal))
 
-@bot.tree.command(name="criar_embed", description="Cria uma embed totalmente customizada com imagem e botão de resposta")
-@app_commands.describe(canal="Canal de destino", cor_hex="Cor lateral em Hex (Ex: #783296)")
+@bot.tree.command(name="criar_embed", description="Cria uma embed totalmente customizada com imagem e botão informativo")
+@app_commands.describe(
+    canal="Canal de destino", 
+    cor_hex="Cor lateral em Hex (Ex: #783296)", 
+    url_imagem_principal="Link da imagem/banner da embed principal (Opcional)"
+)
 @app_commands.default_permissions(administrator=True)
-async def criar_embed_slash(interaction: discord.Interaction, canal: discord.TextChannel, cor_hex: str = None):
-    # O canal e a cor são configurados direto na barra de comandos do Discord
-    await interaction.response.send_modal(ModalCriarEmbedCompleto(canal, cor_hex))
+async def criar_embed_slash(
+    interaction: discord.Interaction, 
+    canal: discord.TextChannel, 
+    cor_hex: str = None, 
+    url_imagem_principal: str = None
+):
+    # Passamos os parâmetros da barra direto para o novo Modal adaptado
+    await interaction.response.send_modal(ModalCriarEmbedCompleto(canal, cor_hex, url_imagem_principal))
 
 @bot.tree.command(name="reiniciar", description="Reinicia o bot de forma limpa e segura")
 @app_commands.default_permissions(administrator=True)
