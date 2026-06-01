@@ -6,6 +6,7 @@ import threading
 import http.server
 import socketserver
 import sys
+import re
 
 # ==========================================
 # ⚙️ CONFIGURAÇÕES DA LOJA (COLOQUE SEUS IDs AQUI)
@@ -13,6 +14,7 @@ import sys
 ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos 
 ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras 
 ID_CATEGORIA_TICKETS = 1468070452655034499  # Substitua pelo ID da categoria onde os tickets serão abertos
+
 # ==========================================
 # 🌐 SERVIDOR WEB PARA MANTER O BOT ACORDADO
 # ==========================================
@@ -36,7 +38,7 @@ threading.Thread(target=rodar_servidor_web, daemon=True).start()
 # ==========================================
 CHAVE_PIX_PADRAO = os.getenv("CHAVE_PIX", "bootaoservices01@gmail.com")
 
-# Dicionário global para guardar os textos e imagens das respostas dos botões
+# Dicionário global para guardar os textos e dados das respostas dos botões
 TEXTOS_EMBED_MEMORIA = {}
 
 class HuTaoBot(commands.Bot):
@@ -48,7 +50,6 @@ class HuTaoBot(commands.Bot):
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self):
-        # Registra as Views necessárias de forma persistente
         self.add_view(ViewAbreTicketDinamico())
         self.add_view(ViewBotaoDinamicoPersistente())
         self.add_view(ViewPainelLogin())
@@ -110,7 +111,7 @@ class ViewAbreTicketDinamico(discord.ui.View):
         return await super().interaction_check(interaction)
 
 # ==========================================
-# 🔘 RECEPTOR DE CLIQUES DOS BOTÕES INFORMATIVOS
+# 🔘 RECEPTOR DE CLIQUES COM SUPORTE A MÚLTIPLAS IMAGENS
 # ==========================================
 class ViewBotaoDinamicoPersistente(discord.ui.View):
     def __init__(self):
@@ -124,22 +125,45 @@ class ViewBotaoDinamicoPersistente(discord.ui.View):
             
             if dados_guardados:
                 titulo = dados_guardados.get("titulo", "Informações")
-                texto = dados_guardados.get("texto", "")
-                img_url = dados_guardados.get("imagem_resposta", "")
+                texto_original = dados_guardados.get("texto", "")
+                img_rodape_url = dados_guardados.get("imagem_resposta", "")
                 cor = dados_guardados.get("cor", discord.Color.from_rgb(120, 50, 150))
                 
-                # Cria uma nova Embed linda contendo o texto e a imagem que você configurou
-                embed_resposta = discord.Embed(
+                # Expressão regular para achar links de imagens direto no meio do texto da resposta
+                regex_imagens = r'(https?://\S+\.(?:png|jpg|jpeg|gif|webp))'
+                links_encontrados = re.findall(regex_imagens, texto_original, re.IGNORECASE)
+                
+                # Remove os links brutos do texto principal para o visual ficar limpo
+                texto_limpo = re.sub(regex_imagens, '', texto_original).strip()
+                
+                # Lista de embeds que serão enviadas juntas (máximo 10 por mensagem no Discord)
+                lista_embeds = []
+                
+                # 1. Cria a Embed Principal de Texto
+                embed_texto = discord.Embed(
                     title=titulo,
-                    description=texto,
+                    description=texto_limpo if texto_limpo else "Visualizar Imagens anexadas:",
                     color=cor
                 )
                 
-                if img_url:
-                    embed_resposta.set_image(url=img_url)
+                # Se o usuário também preencheu o campo de imagem do rodapé do modal, adiciona ela primeiro
+                if img_rodape_url:
+                    embed_texto.set_image(url=img_rodape_url)
+                    lista_embeds.append(embed_texto)
+                else:
+                    # Se não tem imagem de rodapé, mas achou links no texto, bota a primeira imagem na embed principal
+                    if links_encontrados:
+                        embed_texto.set_image(url=links_encontrados.pop(0))
+                    lista_embeds.append(embed_texto)
                 
-                # Envia de forma oculta apenas para quem clicou (ephemeral)
-                await interaction.response.send_message(embed=embed_resposta, ephemeral=True)
+                # 2. Cria embeds extras secundárias para todas as outras imagens encontradas no texto
+                for link_img in links_encontrados[:9]:  # Garante o limite seguro do Discord
+                    embed_extra = discord.Embed(color=cor)
+                    embed_extra.set_image(url=link_img)
+                    lista_embeds.append(embed_extra)
+                
+                # Envia o pacote completo de imagens de forma oculta (Ephemeral)
+                await interaction.response.send_message(embeds=lista_embeds, ephemeral=True)
             else:
                 await interaction.response.send_message("ℹ️ Use os comandos da loja ou abra um ticket para suporte completo!", ephemeral=True)
             return True
@@ -187,8 +211,8 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
     titulo = discord.ui.TextInput(label="Título da Embed Principal", placeholder="Ex: 📜 Tabela de Valores", required=True)
     description = discord.ui.TextInput(label="Descrição / Texto da Embed Principal", style=discord.TextStyle.paragraph, placeholder="Clique no botão abaixo e veja nossos valores...", required=True)
     texto_botao = discord.ui.TextInput(label="Texto do Botão Informativo", placeholder="Ex: 👻 Valores", max_length=50, required=True)
-    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Ao clicar)", style=discord.TextStyle.paragraph, placeholder="Escreva aqui o texto/tabela que vai aparecer na resposta...", required=True)
-    url_imagem_resposta = discord.ui.TextInput(label="URL da Imagem da Resposta (Opcional)", placeholder="Cole o link da imagem que aparece ao clicar...", required=False)
+    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Cole links de imagem tbm!)", style=discord.TextStyle.paragraph, placeholder="Pode escrever seu texto normalmente e colar um ou mais links de imagens direto aqui!", required=True)
+    url_imagem_resposta = discord.ui.TextInput(label="URL da Imagem da Resposta (Opcional)", placeholder="Cole mais um link de imagem de rodapé aqui se quiser...", required=False)
 
     def __init__(self, canal, cor_hex, url_imagem_principal):
         super().__init__()
@@ -205,7 +229,6 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
             except ValueError:
                 pass
 
-        # Cria a Embed Principal que fica fixa no canal
         embed_construida = discord.Embed(
             title=self.titulo.value,
             description=self.description.value.replace(r'\n', '\n'),
@@ -215,10 +238,8 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
         if self.url_imagem_principal:
             embed_construida.set_image(url=self.url_imagem_principal)
 
-        # Gera um ID único e curto baseado na ID da interação
         id_unico_botao = f"info_{interaction.id}"
         
-        # Salva o texto longo E a URL da nova imagem na nossa memória segura
         TEXTOS_EMBED_MEMORIA[id_unico_botao] = {
             "titulo": self.titulo.value,
             "texto": self.resposta_clique.value.replace(r'\n', '\n'),
@@ -260,7 +281,6 @@ async def criar_embed_slash(
     cor_hex: str = None, 
     url_imagem_principal: str = None
 ):
-    # Passamos os parâmetros da barra direto para o novo Modal adaptado
     await interaction.response.send_modal(ModalCriarEmbedCompleto(canal, cor_hex, url_imagem_principal))
 
 @bot.tree.command(name="reiniciar", description="Reinicia o bot de forma limpa e segura")
