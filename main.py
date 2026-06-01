@@ -38,8 +38,9 @@ threading.Thread(target=rodar_servidor_web, daemon=True).start()
 # ==========================================
 CHAVE_PIX_PADRAO = os.getenv("CHAVE_PIX", "bootaoservices01@gmail.com")
 
-# Dicionário global para guardar os textos e dados das respostas dos botões
+# Dicionários globais para otimizar o fluxo e evitar estouro de caracteres no Modal
 TEXTOS_EMBED_MEMORIA = {}
+SETUP_TEMPORARIO_PARAMETROS = {}
 
 class HuTaoBot(commands.Bot):
     def __init__(self):
@@ -129,40 +130,34 @@ class ViewBotaoDinamicoPersistente(discord.ui.View):
                 img_rodape_url = dados_guardados.get("imagem_resposta", "")
                 cor = dados_guardados.get("cor", discord.Color.from_rgb(120, 50, 150))
                 
-                # Expressão regular para achar links de imagens direto no meio do texto da resposta
+                # Regex para identificar links de imagem válidos no corpo do texto
                 regex_imagens = r'(https?://\S+\.(?:png|jpg|jpeg|gif|webp))'
                 links_encontrados = re.findall(regex_imagens, texto_original, re.IGNORECASE)
                 
-                # Remove os links brutos do texto principal para o visual ficar limpo
+                # Limpa links brutos do texto
                 texto_limpo = re.sub(regex_imagens, '', texto_original).strip()
                 
-                # Lista de embeds que serão enviadas juntas (máximo 10 por mensagem no Discord)
                 lista_embeds = []
                 
-                # 1. Cria a Embed Principal de Texto
                 embed_texto = discord.Embed(
                     title=titulo,
                     description=texto_limpo if texto_limpo else "Visualizar Imagens anexadas:",
                     color=cor
                 )
                 
-                # Se o usuário também preencheu o campo de imagem do rodapé do modal, adiciona ela primeiro
                 if img_rodape_url:
                     embed_texto.set_image(url=img_rodape_url)
                     lista_embeds.append(embed_texto)
                 else:
-                    # Se não tem imagem de rodapé, mas achou links no texto, bota a primeira imagem na embed principal
                     if links_encontrados:
                         embed_texto.set_image(url=links_encontrados.pop(0))
                     lista_embeds.append(embed_texto)
                 
-                # 2. Cria embeds extras secundárias para todas as outras imagens encontradas no texto
-                for link_img in links_encontrados[:9]:  # Garante o limite seguro do Discord
+                for link_img in links_encontrados[:9]:  # Mantém o limite seguro de embeds do Discord
                     embed_extra = discord.Embed(color=cor)
                     embed_extra.set_image(url=link_img)
                     lista_embeds.append(embed_extra)
                 
-                # Envia o pacote completo de imagens de forma oculta (Ephemeral)
                 await interaction.response.send_message(embeds=lista_embeds, ephemeral=True)
             else:
                 await interaction.response.send_message("ℹ️ Use os comandos da loja ou abra um ticket para suporte completo!", ephemeral=True)
@@ -170,7 +165,7 @@ class ViewBotaoDinamicoPersistente(discord.ui.View):
         return await super().interaction_check(interaction)
 
 # ==========================================
-# 📥 FORMULÁRIOS DE CONFIGURAÇÃO IMEDIATA
+# 📥 FORMULÁRIOS DE CONFIGURAÇÃO OTIMIZADOS
 # ==========================================
 
 class ModalCriarSetupCompleto(discord.ui.Modal, title="🛒 Configurar Painel de Tickets"):
@@ -211,20 +206,29 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
     titulo = discord.ui.TextInput(label="Título da Embed Principal", placeholder="Ex: 📜 Tabela de Valores", required=True)
     description = discord.ui.TextInput(label="Descrição / Texto da Embed Principal", style=discord.TextStyle.paragraph, placeholder="Clique no botão abaixo e veja nossos valores...", required=True)
     texto_botao = discord.ui.TextInput(label="Texto do Botão Informativo", placeholder="Ex: 👻 Valores", max_length=50, required=True)
-    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Cole links de imagem tbm!)", style=discord.TextStyle.paragraph, placeholder="Pode escrever seu texto normalmente e colar um ou mais links de imagens direto aqui!", required=True)
-    url_imagem_resposta = discord.ui.TextInput(label="URL da Imagem da Resposta (Opcional)", placeholder="Cole mais um link de imagem de rodapé aqui se quiser...", required=False)
+    resposta_clique = discord.ui.TextInput(label="Texto da Resposta (Cole links de imagem tbm!)", style=discord.TextStyle.paragraph, placeholder="Pode escrever seu texto normalmente e colar links de imagens direto aqui!", required=True)
+    url_imagem_resposta = discord.ui.TextInput(label="URL da Imagem da Resposta (Opcional)", placeholder="Cole um link de imagem que aparece ao clicar...", required=False)
 
-    def __init__(self, canal, cor_hex, url_imagem_principal):
+    def __init__(self, token_referencia: str):
         super().__init__()
-        self.canal = canal
-        self.cor_hex = cor_hex
-        self.url_imagem_principal = url_imagem_principal
+        # Usamos apenas uma string de referência curta de ID para puxar os dados pesados com segurança
+        self.token_referencia = token_referencia
 
     async def on_submit(self, interaction: discord.Interaction):
+        # Resgata de forma segura os dados pesados salvos fora do modal
+        parametros = SETUP_TEMPORARIO_PARAMETROS.get(self.token_referencia, {})
+        canal = parametros.get("canal")
+        cor_hex = parametros.get("cor_hex")
+        url_imagem_principal = parametros.get("url_imagem_principal")
+
+        if not canal:
+            await interaction.response.send_message("❌ Houve um erro de sessão ao processar o canal. Tente usar o comando novamente.", ephemeral=True)
+            return
+
         cor = discord.Color.from_rgb(120, 50, 150)
-        if self.cor_hex:
+        if cor_hex:
             try:
-                hex_limpo = self.cor_hex.lstrip('#')
+                hex_limpo = cor_hex.lstrip('#')
                 cor = discord.Color(int(hex_limpo, 16))
             except ValueError:
                 pass
@@ -235,8 +239,8 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
             color=cor
         )
 
-        if self.url_imagem_principal:
-            embed_construida.set_image(url=self.url_imagem_principal)
+        if url_imagem_principal:
+            embed_construida.set_image(url=url_imagem_principal)
 
         id_unico_botao = f"info_{interaction.id}"
         
@@ -254,8 +258,11 @@ class ModalCriarEmbedCompleto(discord.ui.Modal, title="🎨 Criar Embed Personal
             custom_id=id_unico_botao
         ))
 
-        await self.canal.send(embed=embed_construida, view=view_customizada)
-        await interaction.response.send_message(f"✅ Embed personalizada enviada com sucesso em {self.canal.mention}!", ephemeral=True)
+        await canal.send(embed=embed_construida, view=view_customizada)
+        await interaction.response.send_message(f"✅ Embed personalizada enviada com sucesso em {canal.mention}!", ephemeral=True)
+        
+        # Limpa o dicionário temporário para economizar memória ram do bot
+        SETUP_TEMPORARIO_PARAMETROS.pop(self.token_referencia, None)
 
 
 # ==========================================
@@ -281,7 +288,16 @@ async def criar_embed_slash(
     cor_hex: str = None, 
     url_imagem_principal: str = None
 ):
-    await interaction.response.send_modal(ModalCriarEmbedCompleto(canal, cor_hex, url_imagem_principal))
+    # Armazena os links e configurações pesadas fora do Modal
+    token_id = str(interaction.id)
+    SETUP_TEMPORARIO_PARAMETROS[token_id] = {
+        "canal": canal,
+        "cor_hex": cor_hex,
+        "url_imagem_principal": url_imagem_principal
+    }
+    
+    # Abre o formulário ultraleve sem risco de quebra de caracteres
+    await interaction.response.send_modal(ModalCriarEmbedCompleto(token_id))
 
 @bot.tree.command(name="reiniciar", description="Reinicia o bot de forma limpa e segura")
 @app_commands.default_permissions(administrator=True)
