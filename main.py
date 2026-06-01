@@ -84,13 +84,13 @@ class ModalFormularioTicket(discord.ui.Modal, title="🛒 Detalhes do Atendiment
         guild = interaction.guild
         categoria = discord.utils.get(guild.categories, id=ID_CATEGORIA_TICKETS)
         canal = await guild.create_text_channel(name=f"🛒-{interaction.user.name}", category=categoria)
-        embed = discord.Embed(title="<:hutao:1467229432615010316> Detalhes", description=f"Produto: {self.produto.value}\nMétodo: {self.metodo.value}", color=0xc8131e)
+        embed = discord.Embed(title="⚠️ Detalhes", description=f"Produto: {self.produto.value}\nMétodo: {self.metodo.value}", color=0xc8131e)
         await canal.send(content=f"{interaction.user.mention} <@&{ID_CARGO_ATENDENTES}>", embed=embed)
         await interaction.response.send_message(f"✅ Ticket criado: {canal.mention}", ephemeral=True)
 
 class ViewAbreTicketDinamico(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Abrir ticket", style=discord.ButtonStyle.success, custom_id="btn_abrir_ticket_dinamico")
+    @discord.ui.button(label="Fazer Pedido", style=discord.ButtonStyle.success, custom_id="btn_abrir_ticket_dinamico")
     async def abrir_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(ModalFormularioTicket())
 
