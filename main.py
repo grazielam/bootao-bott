@@ -10,7 +10,8 @@ import socketserver
 # ⚙️ CONFIGURAÇÕES DA LOJA (COLOQUE SEUS IDs AQUI)
 # ==========================================
 ID_CANAL_TERMOS = 1457188949364707421  # Substitua pelo ID do canal de termos
-ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de regras
+ID_CANAL_REGRAS = 1457183013807853764  # Substitua pelo ID do canal de termos
+
 
 # ==========================================
 # 🌐 SERVIDOR WEB PARA MANTER O BOT ACORDADO
@@ -64,6 +65,20 @@ class ViewLinksTermos(discord.ui.View):
         self.add_item(discord.ui.Button(label="📋 Ver Regras", style=discord.ButtonStyle.link, url=url_regras))
 
 # ==========================================
+# 📝 FUNÇÃO AUXILIAR PARA GERAR A EMBED DE TERMOS
+# ==========================================
+def gerar_embed_termos():
+    return discord.Embed(
+        title="📜 Termos de Compra — Bootao Services",
+        description=(
+            "• **Dados recebidos com sucesso!** ✨\n"
+            "Antes de começarmos, por favor leia nossos termos de compra.\n\n"
+            "Isso evita qualquer mal entendido durante o atendimento ❤️"
+        ),
+        color=discord.Color.from_rgb(120, 50, 150)
+    )
+
+# ==========================================
 # 🔑 MODAL E FLUXO DE ENVIO DE DADOS DE ACESSO
 # ==========================================
 class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
@@ -90,18 +105,8 @@ class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
         # 3. Envia os dados enviados no canal
         await interaction.response.send_message(embed=embed_recebido)
 
-        # 4. Cria a Embed de Termos da Bootao Services
-        embed_termos = discord.Embed(
-            title="📜 Termos de Compra — Bootao Services",
-            description=(
-                "• **Dados recebidos com sucesso!** ✨\n"
-                "Antes de começarmos, por favor leia nossos termos de compra.\n\n"
-                "Isso evita qualquer mal entendido durante o atendimento ❤️"
-            ),
-            color=discord.Color.from_rgb(120, 50, 150)
-        )
-        
-        # 5. Envia a mensagem de termos com os links configurados de forma independente
+        # 4. Envia a mensagem de termos com os links de forma automática pós-formulário
+        embed_termos = gerar_embed_termos()
         view_links = ViewLinksTermos(interaction.guild_id, ID_CANAL_TERMOS, ID_CANAL_REGRAS)
         await interaction.followup.send(embed=embed_termos, view=view_links)
 
@@ -231,7 +236,10 @@ async def genshin(interaction: discord.Interaction):
 
 @bot.tree.command(name="termos", description="Links dos termos")
 async def termos(interaction: discord.Interaction):
-    await interaction.response.send_message("⚖️ Ao comprar, você aceita as diretrizes de serviço da Bootao Services.")
+    # Agora o comando /termos também envia a embed completa com os botões funcionais!
+    embed_termos = gerar_embed_termos()
+    view_links = ViewLinksTermos(interaction.guild_id, ID_CANAL_TERMOS, ID_CANAL_REGRAS)
+    await interaction.response.send_message(embed=embed_termos, view=view_links)
 
 @bot.event
 async def on_ready():
