@@ -354,13 +354,6 @@ async def criar_embed_slash(
     }
     await interaction.response.send_modal(ModalCriarEmbedCompleto(token_id))
 
-@bot.tree.command(name="reiniciar", description="Reinicia o bot de forma limpa e segura")
-@app_commands.default_permissions(administrator=True)
-async def reiniciar_slash(interaction: discord.Interaction):
-    await interaction.response.send_message("🔄 Reiniciando o bot de forma segura...", ephemeral=True)
-    await bot.close()
-    sys.exit(0)
-
 
 # ==========================================
 # 📜 VIEW DOS BOTÕES DE LINK (TERMOS E REGRAS)
@@ -378,7 +371,7 @@ def gerar_embed_termos():
     return discord.Embed(
         title="📜 Termos de Compra — Bootao Services",
         description=(
-            "Leia os termos para depois não ter dor de cabeça! "
+            "Para garantir que sua experiência com o nosso serviço seja a melhor possível, recomendamos a leitura integral dos nossos Termos de Uso. Este documento esclarece todos os pontos operacionais e as diretrizes que seguimos caso ocorra qualquer intercorrência com o seu pedido. Ressaltamos que, ao prosseguir com a contratação, os termos passam a ter validade legal, servindo como base para a resolução de qualquer questão que possa surgir."
         ),
         color=discord.Color.from_rgb(200, 19, 30)
     )
@@ -472,7 +465,7 @@ class ModalGerarPix(discord.ui.Modal, title="👻 Gerar Cobrança PIX"):
                 "Escolha a forma de pagamento\n\n"
                 "💲 **Valor:**\n"
                 f"**R$ {self.valor.value}**\n\n"
-                "<:emoji_66:1462533125367271654> **Chave Pix:**\n"
+                "💳 **Chave Pix:**\n"
                 f"`{CHAVE_PIX_PADRAO}`\n\n"
                 "**mande o comprovante aqui no chat!**"
                 "Bootao Services 👻 "
