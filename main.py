@@ -138,7 +138,7 @@ class ViewBotaoDinamicoGlobal(discord.ui.View):
 
 
 # 📝 FORMULÁRIO DO TICKET DE COMPRA 
-class ModalFormularioTicket(discord.ui.Modal, title="🛒 Detalhes do Atendimento"):
+class ModalFormularioTicket(discord.ui.Modal, title="✍ Detalhes do Atendimento"):
     produto = discord.ui.TextInput(
         label="Qual produto você deseja?", 
         placeholder="ex: Farm de gemas, Exploração 100%, Build...", 
@@ -330,7 +330,7 @@ async def fechar_ticket(interaction: discord.Interaction):
 @bot.tree.command(name="setup_panel", description="Cria e envia um painel de tickets 100% customizável")
 @app_commands.describe(canal="Selecione o canal onde o painel de tickets será enviado")
 @app_commands.default_permissions(administrator=True)
-async def setup_panel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
+async def setup_painel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
     await interaction.response.send_modal(ModalCriarSetupCompleto(canal))
 
 @bot.tree.command(name="criar_embed", description="Cria uma embed totalmente customizada com imagem e botão informativo")
@@ -378,9 +378,7 @@ def gerar_embed_termos():
     return discord.Embed(
         title="📜 Termos de Compra — Bootao Services",
         description=(
-            "• **Dados recebidos com sucesso!** <:emoji_86:1511368263643299851>\n"
-            "Antes de começarmos, por favor leia nossos termos de compra.\n\n"
-            "Isso evita qualquer mal entendido durante o atendimento <:hutao:1467229432615010316> "
+            "Leia os termos para depois não ter dor de cabeça! "
         ),
         color=discord.Color.from_rgb(200, 19, 30)
     )
@@ -388,9 +386,9 @@ def gerar_embed_termos():
 # ==========================================
 # 🔑 MODAL E FLUXO DE ENVIO DE DADOS DE ACESSO
 # ==========================================
-class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
-    email = discord.ui.TextInput(label="Email (completo)", placeholder="Ex: seuemail@gmail.com")
-    senha = discord.ui.TextInput(label="Senha (completa)", placeholder="Ex: suasenha123")
+class ModalDadosAcesso(discord.ui.Modal, title="🔐 Enviar Dados de Acesso"):
+    email = discord.ui.TextInput(label="Email", placeholder="Ex: seuemail@gmail.com")
+    senha = discord.ui.TextInput(label="Senha", placeholder="Ex: suasenha123")
     servidor = discord.ui.TextInput(label="Servidor", placeholder="Ex: america/europa..")
     metodo = discord.ui.TextInput(label="Método de Login", placeholder="Ex: direto no jogo/google")
 
@@ -403,10 +401,9 @@ class ModalDadosAcesso(discord.ui.Modal, title="🔑 Enviar Dados de Acesso"):
             title="<:emoji_86:1511368263643299851> Dados de Acesso Recebidos",
             color=discord.Color.from_rgb(200, 19, 30)
         )
-        embed_recebido.add_field(name="📩 Email", value=f"`{self.email.value}`", inline=False)
-        embed_recebido.add_field(name="🔒 Senha", value=f"`{self.senha.value}`", inline=False)
-        embed_recebido.add_field(name="🌐 Servidor", value=f"`{self.servidor.value}`", inline=True)
-        embed_recebido.add_field(name="🔗 Método de Login", value=f"`{self.metodo.value}`", inline=True)
+        embed_recebido.add_field(name="📩 Email", value=f"{self.email.value}", inline=False)
+        embed_recebido.add_field(name="🔒 Senha", value=f"{self.senha.value}", inline=False)
+        embed_recebido.add_field(name="🔗 Método de Login", value=f"{self.metodo.value}", inline=True)
         embed_recebido.set_footer(text=f"Enviado por {interaction.user.name} 👻")
 
         await interaction.channel.send(embed=embed_recebido)
@@ -427,7 +424,7 @@ class ViewPainelPix(discord.ui.View):
         super().__init__(timeout=None)
         self.chave_pix = chave_pix
 
-    @discord.ui.button(label="<:boozinho:1463995934370431006> Chave Pix", style=discord.ButtonStyle.primary, custom_id="btn_copiar_pix")
+    @discord.ui.button(label="❤ Chave Pix", style=discord.ButtonStyle.primary, custom_id="btn_copiar_pix")
     async def copiar_pix(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message(f"{self.chave_pix}", ephemeral=True)
 
@@ -441,14 +438,14 @@ class ViewPainelPix(discord.ui.View):
             item.disabled = True
         
         embed_login = discord.Embed(
-            title="🔑 Dados para acesso à sua conta",
+            title="🔐 Dados para acesso à sua conta",
             description=(
                 "📋 • **Precisamos das suas informações de acesso!**\n"
                 "Por favor, clique no botão abaixo e preencha os dados:\n\n"
-                "<:CA_redball:1486523298522202152> **Email** *(completo)*\n"
-                "<:CA_redball:1486523298522202152> **Senha** *(completa)*\n"
-                "<:CA_redball:1486523298522202152> **Servidor** *(ex: América / Europa)*\n"
-                "<:CA_redball:1486523298522202152> **Método de Login** *(ex: Direto no jogo / Google)*"
+                "• **Email** *(completo)*\n"
+                "• **Senha** *(completa)*\n"
+                "• **Servidor** *(ex: América / Ásia)*\n"
+                "• **Método de Login** *(ex: Direto no jogo / Google)*"
             ),
             color=discord.Color.from_rgb(200, 19, 30)
         )
@@ -477,7 +474,8 @@ class ModalGerarPix(discord.ui.Modal, title="👻 Gerar Cobrança PIX"):
                 f"**R$ {self.valor.value}**\n\n"
                 "<:emoji_66:1462533125367271654> **Chave Pix:**\n"
                 f"`{CHAVE_PIX_PADRAO}`\n\n"
-                "Bootao Services "
+                "**mande o comprovante aqui no chat!**"
+                "Bootao Services 👻 "
             ),
             color=discord.Color.from_rgb(200, 19, 30)
         )
@@ -497,10 +495,10 @@ async def login(interaction: discord.Interaction):
         description=(
             "📋 • **Precisamos das suas informações de acesso!**\n"
             "Por favor, clique no botão abaixo e preencha os dados:\n\n"
-            "<:CA_redball:1486523298522202152> **Email** *(completo)*\n"
-            "<:CA_redball:1486523298522202152> **Senha** *(completa)*\n"
-            "<:CA_redball:1486523298522202152> **Servidor** *(ex: América / Europa)*\n"
-            "<:CA_redball:1486523298522202152> **Método de Login** *(ex: Direto no jogo / Google)*"
+            "• **Email** *(completo)*\n"
+            "• **Senha** *(completa)*\n"
+            "• **Servidor** *(ex: América / Europa)*\n"
+            "• **Método de Login** *(ex: Direto no jogo / Google)*"
         ),
         color=discord.Color.from_rgb(200, 19, 30)
     )
@@ -517,11 +515,7 @@ async def diferenca(interaction: discord.Interaction):
     )
     await interaction.response.send_message(texto_diferenca)
 
-@bot.tree.command(name="builds", description="Tipos de build")
-async def builds(interaction: discord.Interaction):
-    await interaction.response.send_message("🛠️ Builds de Dano Crítico, Suporte e Farm cadastrados!")
-
-@bot.tree.command(name="termos", description="Links dos termos")
+@bot.tree.command(name="termos", description="Links dos termos/regras do servidor")
 async def termos(interaction: discord.Interaction):
     embed_termos = gerar_embed_termos()
     view_links = ViewLinksTermos(interaction.guild_id, ID_CANAL_TERMOS, ID_CANAL_REGRAS)
