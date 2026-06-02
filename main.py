@@ -13,7 +13,7 @@ import asyncio
 # ==========================================
 # ⚙️ CONFIGURAÇÕES DA LOJA
 # ==========================================
-ID_CANAL_TERMOS = 1457188949364707421  
+ID_CANAL_TERMOS = 1459951471314600019  
 ID_CANAL_REGRAS = 1457183013807853764  
 ID_CATEGORIA_TICKETS = 1468070452655034499  
 ID_CARGO_ATENDENTES = 1422264212817838132  # Cargo configurado para receber ping no ticket
