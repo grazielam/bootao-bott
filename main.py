@@ -90,7 +90,7 @@ class ModalFormularioTicket(discord.ui.Modal, title="🛒 Detalhes do Atendiment
 
 class ViewAbreTicketDinamico(discord.ui.View):
     def __init__(self): super().__init__(timeout=None)
-    @discord.ui.button(label="Fazer Pedido", style=discord.ButtonStyle.success, custom_id="btn_abrir_ticket_dinamico")
+    @discord.ui.button(label="🛒 Fazer Pedido", style=discord.ButtonStyle.success, custom_id="btn_abrir_ticket_dinamico")
     async def abrir_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_modal(ModalFormularioTicket())
 
